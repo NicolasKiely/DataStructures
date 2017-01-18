@@ -28,6 +28,13 @@ struct node {
 struct node *createNode(char *buf, int bufSize);
 
 /**
+ * Returns copy of input line, stripped of newline
+ * char *line: Raw input
+ * int bufSize: Size of buffer to copy
+ */
+char *copyLine(char *line, int bufSize);
+
+/**
  * Recursively frees node and child nodes
  * struct node *n: Node structure
  */
@@ -42,6 +49,14 @@ void freeNode(struct node *n);
 struct node *findBefore(struct node *root, char *key);
 
 /**
+ * Iteratively find node before exact match with key
+ * struct node *root: Root node
+ * char *key: String to compare
+ * Note: Returns NULL if no such node is found
+ */
+struct node *findExactBefore(struct node *root, char *key);
+
+/**
  * Recursively print node contents
  * struct node *n: Node to print
  */
@@ -54,17 +69,19 @@ int main(int argc, char *argv[]){
   while (true){
     // Read line
     size_t bufSize = 0; // Buffer size
-    char *buf = NULL; // Buffer
-    ssize_t ret = getline(&buf, &bufSize, stdin);
+    char *line = NULL; // Line input
+    ssize_t ret = getline(&line, &bufSize, stdin);
     if (ret <= 0)
       break;
+    char *buf = copyLine(line, bufSize); // Node buffer
 
-    if (buf[0] == '+'){
+    if (line[0] == '+'){
       // Create new node
-      struct node *n = createNode(buf+1, bufSize-1);
+      struct node *n = malloc(sizeof(struct node));
+      n->buf = buf;
 
       // Find node to insert after
-      struct node *ins = findBefore(root, n->buf);
+      struct node *ins = findBefore(root, buf);
 
       if (ins){
         // Insert after this node
@@ -77,12 +94,39 @@ int main(int argc, char *argv[]){
         root = n;
       }
 
+    } else if (line[0]=='-'){
+      if (root){
+        // Remove node
+        if (strcmp(root->buf, buf)){
+          // Search for node
+          struct node *before = findExactBefore(root, buf);
+          if (before){
+            struct node *n = before->next;
+            before->next = n->next;
+
+            free(n->buf);
+            free(n);
+          }
+        } else {
+          // Delete first node
+          struct node *next = root->next;
+          free(root->buf);
+          free(root);
+          root = next;
+        }
+      }
+      if (buf)
+        free(buf);
+        
     } else {
       fprintf(stderr, "Error: Line should start with + or -\n");
+      if (buf)
+        free(buf);
     }
 
     // Free old buffer
-    free(buf);
+    if (line)
+      free(line);
   }
 
   // Print list
@@ -93,20 +137,18 @@ int main(int argc, char *argv[]){
 }
 
 
-struct node *createNode(char *buf, int bufSize){
+char *copyLine(char *line, int bufSize){
   if (bufSize < 0)
     return NULL;
-  struct node *n = malloc(sizeof(struct node));
-  n->buf = malloc(bufSize); // Create new buffer
+  char *buf = malloc(bufSize);
 
-  // Copy up till newline or null byte
   int i;
-  for (i=0; i<bufSize-1 && buf[i]!='\0' && buf[i]!='\n'; i++){
-    n->buf[i] = buf[i];
+  for (i=1; i<bufSize && line[i]!='\0' && line[i]!='\n'; i++){
+    buf[i-1] = line[i];
   }
-  n->buf[i] = '\0';
+  buf[i-1] = '\0';
 
-  return n;
+  return buf;
 }
 
 
@@ -121,6 +163,7 @@ void freeNode(struct node *n){
 
   free(n);
 }
+
 
 struct node *findBefore(struct node *root, char *key){
   if (!root)
@@ -143,6 +186,21 @@ struct node *findBefore(struct node *root, char *key){
       return n;
     }
   }
+}
+
+
+struct node *findExactBefore(struct node *root, char *key){
+  struct node *n = root;
+  struct node *before = NULL;
+  while (n){
+    if (!strcmp(n->buf, key)){
+      return before;
+    }
+
+    before = n;
+    n = n->next;
+  }
+  return NULL;
 }
 
 
